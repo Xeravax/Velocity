@@ -77,6 +77,14 @@ public class SendCommand {
               && context.getSource() instanceof Player) {
             builder.suggest("current");
           }
+          if ("#".regionMatches(0, argument, 0, Math.min(1, argument.length()))) {
+            for (final RegisteredServer registeredServer : server.getAllServers()) {
+              final String serverName = "#" + registeredServer.getServerInfo().getName();
+              if (serverName.regionMatches(true, 0, argument, 0, argument.length())) {
+                builder.suggest(serverName);
+              }
+            }
+          }
           return builder.buildFuture();
         })
         .executes(this::usage);
@@ -128,6 +136,25 @@ public class SendCommand {
     }
 
     final RegisteredServer targetServer = maybeServer.get();
+
+    // Handle sending from a specific server
+    if (player.startsWith("#")) {
+      final String sourceServerName = player.substring(1);
+      final Optional<RegisteredServer> maybeSourceServer = server.getServer(sourceServerName);
+      
+      if (maybeSourceServer.isEmpty()) {
+        context.getSource().sendMessage(
+            CommandMessages.SERVER_DOES_NOT_EXIST.arguments(Argument.string("server", sourceServerName))
+        );
+        return 0;
+      }
+      
+      final RegisteredServer sourceServer = maybeSourceServer.get();
+      for (final Player p : sourceServer.getPlayersConnected()) {
+        p.createConnectionRequest(targetServer).fireAndForget();
+      }
+      return Command.SINGLE_SUCCESS;
+    }
 
     final Optional<Player> maybePlayer = server.getPlayer(player);
     if (maybePlayer.isEmpty()
